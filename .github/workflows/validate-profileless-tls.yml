@@ -1,0 +1,51 @@
+name: Validate profileless TLS loading
+on:
+  push:
+    branches: [validation/profileless-tls-20261106]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    name: Windows certificate loading and TLS
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+      DOTNET_NOLOGO: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: '10.0.403'
+      - name: Record source and environment
+        shell: pwsh
+        run: |
+          git rev-parse HEAD
+          dotnet --info
+          Get-FileHash libs/server/TLS/CertificateUtils.cs -Algorithm SHA256
+      - name: Build Garnet
+        shell: pwsh
+        run: dotnet build Garnet.slnx -c Release -m:2
+      - name: Run certificate and TLS regression tests
+        shell: pwsh
+        run: dotnet test test/standalone/Garnet.test/Garnet.test.csproj -f net10.0 -c Release -m:2 --filter "FullyQualifiedName~Certificate|FullyQualifiedName~RespTls" --logger "trx;LogFileName=windows-tls.trx" --logger "console;verbosity=normal" --results-directory TestResults
+      - name: Compare baseline and candidate without a user profile
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          & ./.validation/garnet2349/Run-Validation.ps1 -RepoRoot $env:GITHUB_WORKSPACE -CandidateSourcePath (Join-Path $env:GITHUB_WORKSPACE 'libs/server/TLS/CertificateUtils.cs') -BaseSha '5cc8f3f50aa57ed694dfda928e4467593e073656' -OutputDirectory (Join-Path $env:RUNNER_TEMP 'garnet2349-results')
+          exit $LASTEXITCODE
+      - name: Retain test evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: garnet2349-windows-evidence
+          retention-days: 5
+          path: |
+            TestResults/*.trx
+            ${{ runner.temp }}/garnet2349-results/*.json
