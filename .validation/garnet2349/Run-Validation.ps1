@@ -39,6 +39,8 @@ function Get-SafeError($ErrorRecord) {
     return [ordered]@{
         type = $ErrorRecord.Exception.GetType().FullName
         hresult = ('0x{0:X8}' -f $ErrorRecord.Exception.HResult)
+        scriptLine = $ErrorRecord.InvocationInfo.ScriptLineNumber
+        innerType = $ErrorRecord.Exception.InnerException?.GetType().FullName
     }
 }
 
@@ -135,8 +137,8 @@ try {
         if (-not $CandidateSourcePath) { throw 'CandidateSourcePath is required unless BaselineOnly is set.' }
         $CandidateSourcePath = (Resolve-Path -LiteralPath $CandidateSourcePath).Path
     }
-    $dotnet = (Get-Command dotnet -CommandType Application).Source
-    $git = (Get-Command git -CommandType Application).Source
+    $dotnet = (@(Get-Command dotnet -CommandType Application)[0]).Source
+    $git = (@(Get-Command git -CommandType Application)[0]).Source
     $tempRoot = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
     $work = Join-Path $tempRoot "garnet2349-work-$runId"
     Assert-OutsideRepo $work

@@ -1,13 +1,13 @@
 name: Validate profileless TLS loading
 on:
   push:
-    branches: [validation/profileless-tls-20261106]
+    branches: [validation/profileless-account-20261106]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   windows:
-    name: Windows certificate loading and TLS
+    name: Windows unloaded-profile comparison
     runs-on: windows-2022
     timeout-minutes: 20
     env:
@@ -28,12 +28,6 @@ jobs:
           git rev-parse HEAD
           dotnet --info
           Get-FileHash libs/server/TLS/CertificateUtils.cs -Algorithm SHA256
-      - name: Build Garnet
-        shell: pwsh
-        run: dotnet build Garnet.slnx -c Release -m:2
-      - name: Run certificate and TLS regression tests
-        shell: pwsh
-        run: dotnet test test/standalone/Garnet.test/Garnet.test.csproj -f net10.0 -c Release -m:2 --filter "FullyQualifiedName~Certificate|FullyQualifiedName~RespTls" --logger "trx;LogFileName=windows-tls.trx" --logger "console;verbosity=normal" --results-directory TestResults
       - name: Compare baseline and candidate without a user profile
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -47,5 +41,4 @@ jobs:
           name: garnet2349-windows-evidence
           retention-days: 5
           path: |
-            TestResults/*.trx
             ${{ runner.temp }}/garnet2349-results/*.json
